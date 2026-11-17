@@ -1,0 +1,12 @@
+{
+  "consumer": { "name": "webpact-consumer" },
+  "provider": { "name": "webpact-testing" },
+  "interactions": [
+    {
+      "description": "a request for hello again",
+      "request": { "method": "GET", "path": "/hello" },
+      "response": { "status": 200, "body": { "message": "hello" } }
+    }
+  ],
+  "metadata": { "pactSpecification": { "version": "2.0.0" } }
+}
