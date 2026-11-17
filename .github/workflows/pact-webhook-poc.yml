@@ -1,0 +1,56 @@
+name: pact-webhook-poc
+
+# Receives the Pact Broker webhook (a repository_dispatch event) and shows what arrived.
+# repository_dispatch only runs workflows that exist on the default branch.
+on:
+  repository_dispatch:
+    types: [contract_requiring_verification_published]
+
+permissions:
+  contents: read
+
+jobs:
+  show-payload:
+    name: Show the webhook payload
+    runs-on: ubuntu-latest
+    steps:
+      - name: Show and check the payload
+        # Values go through env, never straight into the script, so a payload cannot inject shell.
+        env:
+          EVENT_TYPE: ${{ github.event.action }}
+          PACT_URL: ${{ github.event.client_payload.pact_url }}
+          PROVIDER_VERSION: ${{ github.event.client_payload.sha }}
+          PROVIDER_BRANCH: ${{ github.event.client_payload.branch }}
+          MESSAGE: ${{ github.event.client_payload.message }}
+        run: |
+          set -euo pipefail
+
+          {
+            echo "## Pact webhook received"
+            echo
+            echo "- event_type: \`$EVENT_TYPE\`"
+            echo "- pact_url: \`$PACT_URL\`"
+            echo "- provider version (sha): \`$PROVIDER_VERSION\`"
+            echo "- provider branch: \`$PROVIDER_BRANCH\`"
+            echo "- message: $MESSAGE"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "event_type=$EVENT_TYPE"
+          echo "pact_url=$PACT_URL"
+          echo "sha=$PROVIDER_VERSION"
+          echo "branch=$PROVIDER_BRANCH"
+          echo "message=$MESSAGE"
+
+          # Every field must be filled in, and no Broker placeholder may be left unsubstituted.
+          status=0
+          for name in PACT_URL PROVIDER_VERSION PROVIDER_BRANCH MESSAGE; do
+            value="${!name}"
+            if [ -z "$value" ]; then
+              echo "::error::$name is empty"
+              status=1
+            elif [[ "$value" == *'${pactbroker.'* ]]; then
+              echo "::error::$name still contains an unsubstituted placeholder: $value"
+              status=1
+            fi
+          done
+          exit "$status"
